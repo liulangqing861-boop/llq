@@ -1,7 +1,7 @@
 const app = document.getElementById("app");
 const toastEl = document.getElementById("toast");
 
-const car = (name) => `./${name}`;
+const car = (name) => `./assets/cars/${name}`;
 const ADMISSION_DEPOSIT_AMOUNT = 2000;
 const ACCESS_STORAGE_KEY = "xincheng:access-state-v2";
 const DRAFT_PAYMENT_DAYS = 3;
@@ -481,6 +481,8 @@ function icon(name) {
     ban: '<circle cx="12" cy="12" r="9"></circle><path d="M5.7 5.7 18.3 18.3"></path>',
     wallet: '<path d="M4 7h16v12H4z"></path><path d="M17 12h4v4h-4a2 2 0 0 1 0-4Z"></path>',
     phone: '<path d="M5 4h4l2 5-3 2a13 13 0 0 0 5 5l2-3 5 2v4a2 2 0 0 1-2 2A15 15 0 0 1 3 6a2 2 0 0 1 2-2Z"></path>',
+    camera: '<path d="M4 8h4l1.5-2h5L16 8h4v11H4z"></path><circle cx="12" cy="13" r="3.5"></circle>',
+    image: '<rect x="3" y="4" width="18" height="16" rx="2"></rect><circle cx="9" cy="10" r="2"></circle><path d="m4 18 5-5 4 4 2-2 5 4"></path>',
     building: '<path d="M4 21V5l8-3 8 3v16"></path><path d="M8 9h2M14 9h2M8 13h2M14 13h2M9 21v-4h6v4"></path>',
     pin: '<path d="M12 21s7-5.3 7-11a7 7 0 0 0-14 0c0 5.7 7 11 7 11Z"></path><circle cx="12" cy="10" r="2.5"></circle>',
     help: '<circle cx="12" cy="12" r="9"></circle><path d="M9.5 9a2.8 2.8 0 1 1 4.5 2.2c-1 .7-2 1.2-2 2.8M12 17h.1"></path>',
@@ -825,21 +827,43 @@ function renderVoucherUploadDialog() {
   const order = state.voucherUploadOrderId ? orderById(state.voucherUploadOrderId) : null;
   if (!order || order.status !== "processing" || order.processingStage !== "locked_pending_payment") return "";
   const hasFile = Boolean(state.voucherFileName);
+  const isImage = Boolean(hasFile && state.voucherFileUrl && state.voucherFileType?.startsWith("image/"));
   return `
-    <div class="mini-modal-mask" data-voucher-upload-backdrop>
-      <section class="mini-modal voucher-upload-modal" role="dialog" aria-modal="true" aria-labelledby="voucher-upload-title">
-        <button class="modal-close-x" data-voucher-upload-close aria-label="关闭">×</button>
-        <h3 id="voucher-upload-title">上传支付凭证</h3>
-        <p>请上传本次车辆款项的支付凭证。上传完成后，履约进度将更新为“已支付”。</p>
-        <label class="voucher-picker ${hasFile ? "selected" : ""}">
-          <input type="file" accept="image/*,.pdf" data-voucher-file />
-          ${icon(hasFile ? "check" : "file")}
-          <span>${hasFile ? escapeAttribute(state.voucherFileName) : "选择支付凭证"}</span>
-          <small>${hasFile ? "已选择，可确认上传" : "支持图片或 PDF 文件"}</small>
-        </label>
-        <div class="mini-modal-actions">
-          <button class="ghost-btn" data-voucher-upload-close>取消</button>
-          <button class="brand-confirm-btn" data-voucher-upload-confirm ${hasFile ? "" : "disabled"}>确认上传</button>
+    <div class="mobile-sheet-mask" data-voucher-upload-backdrop>
+      <section class="mobile-upload-sheet" role="dialog" aria-modal="true" aria-labelledby="voucher-upload-title">
+        <span class="mobile-sheet-handle" aria-hidden="true"></span>
+        <header class="mobile-sheet-header">
+          <div>
+            <h3 id="voucher-upload-title">上传支付凭证</h3>
+            <p>上传后，履约进度将更新为“已支付”</p>
+          </div>
+          <button class="mobile-sheet-close" data-voucher-upload-close aria-label="关闭">×</button>
+        </header>
+        ${hasFile
+          ? `<div class="mobile-selected-file">
+               <div class="mobile-file-thumb ${isImage ? "image" : "document"}">
+                 ${isImage
+                   ? `<img src="${escapeAttribute(state.voucherFileUrl)}" alt="已选择的支付凭证" />`
+                   : icon("file")}
+               </div>
+               <div class="mobile-file-info">
+                 <strong>${escapeAttribute(state.voucherFileName)}</strong>
+                 <small>${state.voucherFileType === "application/pdf" ? "PDF 文件" : "图片凭证"}· 已选择</small>
+               </div>
+               <label class="mobile-reselect-btn">重新选择<input type="file" accept="image/*,.pdf" data-voucher-file /></label>
+             </div>`
+          : `<label class="mobile-upload-option">
+               <span class="mobile-upload-option-icon">${icon("image")}</span>
+               <span class="mobile-upload-option-copy">
+                 <strong>选择上传</strong>
+                 <small>可从手机相册或文件中选择，支持图片和 PDF</small>
+               </span>
+               <span class="mobile-upload-chevron">›</span>
+               <input type="file" accept="image/*,.pdf" data-voucher-file />
+             </label>`}
+        <div class="mobile-sheet-actions ${hasFile ? "dual" : "single"}">
+          <button class="mobile-secondary-btn" data-voucher-upload-close>取消</button>
+          ${hasFile ? `<button class="mobile-primary-btn" data-voucher-upload-confirm>确认上传</button>` : ""}
         </div>
       </section>
     </div>
@@ -861,19 +885,22 @@ function renderVoucherPreviewDialog() {
            <span>${escapeAttribute(order.paymentVoucherName || "车款支付凭证")}</span>
          </div>`;
   return `
-    <div class="mini-modal-mask" data-voucher-preview-backdrop>
-      <section class="mini-modal voucher-preview-modal" role="dialog" aria-modal="true" aria-labelledby="voucher-preview-title">
-        <button class="modal-close-x" data-voucher-preview-close aria-label="关闭">×</button>
-        <h3 id="voucher-preview-title">支付凭证</h3>
+    <div class="voucher-preview-screen" role="dialog" aria-modal="true" aria-labelledby="voucher-preview-title">
+      <header class="voucher-preview-header">
+        ${miniProgramStatus()}
+        <div class="voucher-preview-topbar">
+          <button data-voucher-preview-close aria-label="返回">${icon("back")}</button>
+          <h3 id="voucher-preview-title">支付凭证</h3>
+          <span></span>
+        </div>
+      </header>
+      <main class="voucher-preview-content">
         <div class="payment-voucher-preview">${preview}</div>
-        <div class="payment-voucher-meta">
-          <span>文件名称</span><strong>${escapeAttribute(order.paymentVoucherName || "支付凭证")}</strong>
-          <span>上传时间</span><strong>${order.paymentVoucherUploadedAt || "--"}</strong>
-        </div>
-        <div class="mini-modal-actions">
-          <button class="brand-confirm-btn single-modal-action" data-voucher-preview-close>关闭</button>
-        </div>
-      </section>
+      </main>
+      <footer class="payment-voucher-info-card">
+        <div><span>文件名称</span><strong>${escapeAttribute(order.paymentVoucherName || "支付凭证")}</strong></div>
+        <div><span>上传时间</span><strong>${order.paymentVoucherUploadedAt || "--"}</strong></div>
+      </footer>
     </div>
   `;
 }
@@ -2659,12 +2686,6 @@ document.addEventListener("click", (event) => {
 
   const closeVoucherPreview = event.target.closest("[data-voucher-preview-close]");
   if (closeVoucherPreview) {
-    closePaymentVoucher();
-    return;
-  }
-
-  const voucherPreviewBackdrop = event.target.closest("[data-voucher-preview-backdrop]");
-  if (voucherPreviewBackdrop && event.target === voucherPreviewBackdrop) {
     closePaymentVoucher();
     return;
   }
